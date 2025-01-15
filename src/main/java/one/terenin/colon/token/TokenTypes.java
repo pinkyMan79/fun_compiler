@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 // {} - expression brackets (all program is expression)
-// () - paren expression brackets
+// () - paren expression brackets, u.e. if, while ...
 
 public enum TokenTypes {
     NUM, VAR, IF, ELSE, WHILE, LBRA, RBRA, LPAR, RPAR,
