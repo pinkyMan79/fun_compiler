@@ -6,6 +6,7 @@ import one.terenin.colon.token.Token;
 import one.terenin.colon.token.TokenTypes;
 
 import java.util.List;
+import java.util.Objects;
 
 public class Parser {
 
@@ -132,6 +133,8 @@ public class Parser {
 
         if (!arExpr(node)) return false;
 
+        Node cache = new Node(node.type, node.value, node.op1, node.op2, node.op3);
+
         if (currentTokenIndex < tokens.size() && tokens.get(currentTokenIndex).type == TokenTypes.LESS) {
             Node lessThanNode = new Node(NodeTypes.LESSTHEN);
             lessThanNode.op1 = node;
@@ -139,7 +142,7 @@ public class Parser {
             lessThanNode.op2 = new Node();
             if (!arExpr(lessThanNode.op2)) return false;
             node.type = lessThanNode.type;
-            node.op1 = lessThanNode.op1;
+            node.op1 = cache;
             node.op2 = lessThanNode.op2;
         }
         return true;
@@ -149,6 +152,8 @@ public class Parser {
         if (currentTokenIndex >= tokens.size()) return false;
 
         if (!term(node)) return false;
+
+        Node cache = new Node(node.type, node.value, node.op1, node.op2, node.op3);
 
         while (currentTokenIndex < tokens.size() && (tokens.get(currentTokenIndex).type == TokenTypes.DIV
                 || tokens.get(currentTokenIndex).type == TokenTypes.SUB
@@ -169,7 +174,7 @@ public class Parser {
             tmpNode.op2 = new Node();
             if (!term(tmpNode.op2)) return false;
             node.type = tmpNode.type;
-            node.op1 = tmpNode.op1;
+            node.op1 = cache;
             node.op2 = tmpNode.op2;
         }
         return true;

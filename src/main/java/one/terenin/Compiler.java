@@ -4,6 +4,8 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import one.terenin.colon.node.Node;
+import one.terenin.colon.node.NodeTypes;
+import one.terenin.colon.service.Parser;
 import one.terenin.colon.token.Token;
 import one.terenin.colon.token.TokenTypes;
 
@@ -19,8 +21,8 @@ public class Compiler {
     int nowPos = 0;
     List<Token> tokens = new ArrayList<>();
     
-    static Map<String, TokenTypes> specialSymbols = new HashMap<>();
-    static Map<String, TokenTypes> specialWords = new HashMap<>();
+    static Map<String, TokenTypes> specialSymbols = TokenTypes.charMap();
+    static Map<String, TokenTypes> specialWords = TokenTypes.wordsMap();
 
     public Compiler(char[] text, int textLen) {
         this.text = text;
@@ -30,15 +32,22 @@ public class Compiler {
     public boolean compile(StringBuilder out) {
 
         Token token = getNextToken();
-        while (!token.getType().equals(TokenTypes.ENDFILE)) {
-            if (token.getType().equals(TokenTypes.ERROR)) {
+        while (!token.type.equals(TokenTypes.ENDFILE)) {
+            if (token.type.equals(TokenTypes.ERROR)) {
                 throw new RuntimeException("Error on token parsing step");
             }
             tokens.add(token);
             token = getNextToken();
         }
+        Node tree = new Node(NodeTypes.EMPTY, 0);
 
-        return false;
+        boolean parsed = new Parser().parse(tokens, tree);
+        System.out.println(tree);
+        Debug.inOrder(tree);
+        if (!parsed) {
+            return false;
+        }
+        return true;
     }
 
     private Token getNextToken() {
@@ -60,7 +69,7 @@ public class Compiler {
             if (concentrator.isEmpty()) {
                 // validate for symbol or digit or variable
                 if (specialSymbols.containsKey(currChar + "")) {
-                    return new Token(specialSymbols.get(concentrator));
+                    return new Token(specialSymbols.get(currChar + ""));
                 } else if (isDigit(currChar)) {
                     // number like 1235 or e.g.
                     do {
@@ -74,7 +83,10 @@ public class Compiler {
                     concentrator += currChar;
                 }
             } else {
-                if (specialWords.containsKey(currChar + "")) {
+                if (specialSymbols.containsKey(currChar + "")) {
+                    // for cases like a< and e.g.
+                    // we detect that special symbol appears before any word
+                    // wove careet on step back and break
                     nowPos--;
                     break;
                 }
