@@ -8,158 +8,195 @@ import one.terenin.colon.token.TokenTypes;
 import java.util.List;
 
 public class Parser {
-    public static boolean parse(List<Token> tokens, Node result) {
-        int count = 0;
-        boolean parsed = statement(tokens, count, result);
-        if (count != tokens.size() - 1 || !parsed) {
+
+    private int currentTokenIndex = 0;
+    private List<Token> tokens;
+
+    private Node root;
+
+    public boolean parse(List<Token> tokens, Node result) {
+        this.tokens = tokens;
+        this.root = result;
+        currentTokenIndex = 0;
+        if (statement(result)) {
+            return currentTokenIndex == tokens.size();
+        }
+        return false;
+    }
+
+    private boolean statement(Node node) {
+        if (currentTokenIndex >= tokens.size()) {
             return false;
+        }
+
+        switch (tokens.get(currentTokenIndex).type) {
+            case IF:
+                currentTokenIndex++;
+                node.type = NodeTypes.IF;
+                node.op1 = new Node();
+                if (!parenExpr(node.op1)) return false;
+                node.op2 = new Node();
+                if (!statement(node.op2)) return false;
+
+                if (currentTokenIndex < tokens.size() && tokens.get(currentTokenIndex).type == TokenTypes.ELSE) {
+                    node.type = NodeTypes.IFELSE;
+                    currentTokenIndex++;
+                    node.op3 = new Node();
+                    if (!statement(node.op3)) return false;
+                }
+                return true;
+            case WHILE:
+                currentTokenIndex++;
+                node.type = NodeTypes.WHILE;
+                node.op1 = new Node();
+                if (!parenExpr(node.op1)) return false;
+                node.op2 = new Node();
+                if (!statement(node.op2)) return false;
+                return true;
+            case LBRA:
+                currentTokenIndex++;
+                node.type = NodeTypes.SEQ;
+                Node currentSeqNode = node;
+                while (currentTokenIndex < tokens.size() && tokens.get(currentTokenIndex).type != TokenTypes.RBRA) {
+                    currentSeqNode.op2 = new Node();
+                    if (!statement(currentSeqNode.op2)) return false;
+                    if (currentTokenIndex < tokens.size() && tokens.get(currentTokenIndex).type != TokenTypes.RBRA) {
+                        currentSeqNode.op1 = new Node(NodeTypes.SEQ);
+                        currentSeqNode = currentSeqNode.op1;
+                    }
+                }
+                if (currentTokenIndex < tokens.size() && tokens.get(currentTokenIndex).type == TokenTypes.RBRA) {
+                    currentTokenIndex++;
+                    return true;
+                }
+                return false;
+            case SEMICOL:
+                currentTokenIndex++;
+                return true;
+            case PRINT:
+                currentTokenIndex++;
+                node.type = NodeTypes.PRINT;
+                node.op1 = new Node();
+                if (!parenExpr(node.op1)) return false;
+                return true;
+            default:
+                node.type = NodeTypes.EXPR;
+                node.op1 = new Node();
+                if (!expr(node.op1)) return false;
+                if (currentTokenIndex >= tokens.size() || tokens.get(currentTokenIndex).type != TokenTypes.SEMICOL) return false;
+                currentTokenIndex++;
+                return true;
+        }
+    }
+
+    private boolean parenExpr(Node node) {
+        if (currentTokenIndex >= tokens.size() || tokens.get(currentTokenIndex).type != TokenTypes.LPAR) {
+            return false;
+        }
+        currentTokenIndex++;
+        if (!expr(node)) {
+            return false;
+        }
+        if (currentTokenIndex >= tokens.size() || tokens.get(currentTokenIndex).type != TokenTypes.RPAR) {
+            return false;
+        }
+        currentTokenIndex++;
+        return true;
+    }
+
+    private boolean expr(Node node) {
+        if (currentTokenIndex >= tokens.size()) return false;
+        int initialIndex = currentTokenIndex;
+
+        Node leftNode = new Node();
+        if (!test(leftNode)) return false;
+
+        if (leftNode.type == NodeTypes.VAR && currentTokenIndex < tokens.size() && tokens.get(currentTokenIndex).type == TokenTypes.ASSIG) {
+            Node assignNode = new Node(NodeTypes.SET);
+            assignNode.op1 = leftNode;
+            currentTokenIndex++;
+            assignNode.op2 = new Node();
+            if (!test(assignNode.op2)) return false;
+            node.type = assignNode.type;
+            node.op1 = assignNode.op1;
+            node.op2 = assignNode.op2;
+            return true;
+        } else {
+            currentTokenIndex = initialIndex;
+            return test(node);
+        }
+    }
+
+    private boolean test(Node node) {
+        if (currentTokenIndex >= tokens.size()) return false;
+
+        if (!arExpr(node)) return false;
+
+        if (currentTokenIndex < tokens.size() && tokens.get(currentTokenIndex).type == TokenTypes.LESS) {
+            Node lessThanNode = new Node(NodeTypes.LESSTHEN);
+            lessThanNode.op1 = node;
+            currentTokenIndex++;
+            lessThanNode.op2 = new Node();
+            if (!arExpr(lessThanNode.op2)) return false;
+            node.type = lessThanNode.type;
+            node.op1 = lessThanNode.op1;
+            node.op2 = lessThanNode.op2;
         }
         return true;
     }
 
-    private static boolean statement(List<Token> tokens, int count, Node node) {
-        boolean parsed = true;
-        switch (tokens.get(count).type) {
-            case IF -> {
-                count++;
-                node.type = NodeTypes.IF;
-                parsed = parenExpr(tokens, count, node.op1);
-                if (!parsed) return false;
-                parsed = statement(tokens, count, node.op2);
-                if (!parsed) return false;
+    private boolean arExpr(Node node) {
+        if (currentTokenIndex >= tokens.size()) return false;
 
-                if (tokens.get(count).type == TokenTypes.ELSE) {
-                    node.type = NodeTypes.IFELSE;
-                    count++;
-                    parsed = statement(tokens, count, node.op3);
-                    if (!parsed) return false;
-                }
+        if (!term(node)) return false;
+
+        while (currentTokenIndex < tokens.size() && (tokens.get(currentTokenIndex).type == TokenTypes.DIV
+                || tokens.get(currentTokenIndex).type == TokenTypes.SUB
+                || tokens.get(currentTokenIndex).type == TokenTypes.ADD
+                || tokens.get(currentTokenIndex).type == TokenTypes.MUL)) {
+
+            NodeTypes nodeType = switch (tokens.get(currentTokenIndex).type) {
+                case DIV -> NodeTypes.DIV;
+                case SUB -> NodeTypes.SUB;
+                case MUL -> NodeTypes.MUL;
+                case ADD -> NodeTypes.ADD;
+                default -> NodeTypes.EMPTY;
+            };
+
+            Node tmpNode = new Node(nodeType);
+            tmpNode.op1 = node;
+            currentTokenIndex++;
+            tmpNode.op2 = new Node();
+            if (!term(tmpNode.op2)) return false;
+            node.type = tmpNode.type;
+            node.op1 = tmpNode.op1;
+            node.op2 = tmpNode.op2;
+        }
+        return true;
+    }
+
+    // the leaves generator of our syntax tree
+    private boolean term(Node node) {
+        if (currentTokenIndex >= tokens.size()) return false;
+        Token token = tokens.get(currentTokenIndex);
+
+        switch (token.type) {
+            case VAR -> {
+                node.type = NodeTypes.VAR;
+                node.value = token.variable - 'a';
+                currentTokenIndex++;
             }
-            case WHILE -> {
-                 count++;
-                 node.type = NodeTypes.WHILE;
-                 parsed = parenExpr(tokens, count, node.op1);
-                 if (!parsed) return false;
-                 parsed = statement(tokens, count, node.op2);
-                 if (!parsed) return false;
-            }
-            case LBRA -> {
-                count++;
-                while (count < tokens.size() && tokens.get(count).type != TokenTypes.RBRA) {
-                    node = new Node(NodeTypes.SEQ, 0, node, null, null);
-                    parsed = statement(tokens, count, node.op2);
-                    if (!parsed) return false;
-                }
-                count++;
-            }
-            case SEMICOL -> count++;
-            case PRINT -> {
-                count++;
-                node.type = NodeTypes.PRINT;
-                parsed = parenExpr(tokens, count, node.op1);
-                if (!parsed) return false;
+            case NUM -> {
+                node.type = NodeTypes.CONST;
+                node.value = token.value;
+                currentTokenIndex++;
             }
             default -> {
-                node.type = NodeTypes.EXPR;
-                parsed = expr(tokens, count, node.op1);
-                if (tokens.get(count++).type != TokenTypes.SEMICOL) return false;
-                if (!parsed) return false;
+                boolean res = parenExpr(node);
+                if (!res) {
+                    return false;
+                }
             }
-        }
-        return true;
-    }
-
-    private static boolean parenExpr(List<Token> tokens, int count, Node node) {
-        Token token = tokens.get(count);
-        if (token.type != TokenTypes.LPAR) {
-            return false;
-        }
-        count ++;
-        expr(tokens, count, node);
-        if (token.type != TokenTypes.RPAR) {
-            return false;
-        }
-        count ++;
-        return true;
-    }
-
-    private static boolean expr(List<Token> tokens, int count, Node node) {
-        Token token = tokens.get(count);
-        if (token.type != TokenTypes.VAR) {
-            return test(tokens, count, node);
-        }
-        boolean result = test(tokens, count, node);
-        if (!result) return false;
-
-        if (node.type == NodeTypes.VAR && token.type == TokenTypes.ASSIG) {
-            node = new Node(NodeTypes.SET, 0, node, null, null);
-            count++;
-            result = expr(tokens, count, node.op2);
-        }
-        return result;
-    }
-
-    private static boolean test(List<Token> tokens, int count, Node node) {
-
-        boolean result = arExpr(tokens, count, node);
-        if (!result) return false;
-        Token token = tokens.get(count);
-        if (token.type != TokenTypes.LESS) {
-            count++;
-            node = new Node(NodeTypes.LESSTHEN, 0, node, null, null);
-            result = arExpr(tokens, count, node.op2);
-        }
-
-        return result;
-    }
-
-    private static boolean arExpr(List<Token> tokens, int count, Node node) {
-
-        boolean res = term(tokens, count, node);
-        if (!res) return false;
-        TokenTypes currType = tokens.get(count).type;
-        while (currType == TokenTypes.DIV
-                || currType == TokenTypes.SUB
-                || currType == TokenTypes.ADD
-                || currType == TokenTypes.MUL) {
-            NodeTypes nodeType = null;
-            switch (currType) {
-                case DIV -> nodeType = NodeTypes.DIV;
-                case SUB -> nodeType = NodeTypes.SUB;
-                case MUL -> nodeType = NodeTypes.MUL;
-                case ADD -> nodeType = NodeTypes.ADD;
-                default -> nodeType = NodeTypes.EMPTY;
-            }
-
-            // the arithmetical expression has 2 child
-            // op1 - first operand, op2 - second operand
-            // by calling term firstly we migrate our node type to var or const
-            // after that we generate new node (with arType) and assign it as parent of firstly term
-            // op1 - will be the calculated term firstly
-            node = new Node(nodeType, 0, node, null, null);
-            count ++;
-            // we need to push new node on a leaf and assign it as second operand and push it to op2
-            boolean result = term(tokens, count, node.op2);
-            if (!result) return false;
-            currType = tokens.get(count).type;
-        }
-
-        return true;
-    }
-
-    // the leaves of our syntax tree
-    private static boolean term(List<Token> tokens, int count, Node node) {
-
-        Token token = tokens.get(count);
-        if (token.type == TokenTypes.VAR) {
-            node = new Node(NodeTypes.VAR, token.variable - 'a');
-            count++;
-        } else if (token.type == TokenTypes.NUM) {
-            node = new Node(NodeTypes.CONST, token.value);
-            count++;
-        } else {
-            // expression case
-            return parenExpr(tokens, count, node);
         }
         return true;
     }
