@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import one.terenin.colon.node.Node;
 import one.terenin.colon.node.NodeTypes;
+import one.terenin.colon.service.Extender;
 import one.terenin.colon.service.Parser;
 import one.terenin.colon.token.Token;
 import one.terenin.colon.token.TokenTypes;
@@ -29,7 +30,7 @@ public class Compiler {
         this.textLen = textLen;
     }
 
-    public boolean compile(StringBuilder out) {
+    public boolean compile() {
 
         Token token = getNextToken();
         while (!token.type.equals(TokenTypes.ENDFILE)) {
@@ -40,13 +41,11 @@ public class Compiler {
             token = getNextToken();
         }
         Node tree = new Node(NodeTypes.EMPTY, 0);
-
         boolean parsed = new Parser().parse(tokens, tree);
-        System.out.println(tree);
-        Debug.inOrder(tree);
-        if (!parsed) {
-            return false;
-        }
+
+        Extender extender = new Extender(tree);
+        String compile = extender.compile();
+        System.out.println(compile);
         return true;
     }
 

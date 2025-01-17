@@ -7,9 +7,25 @@ import java.util.Map;
 // () - paren expression brackets, u.e. if, while ...
 
 public enum TokenTypes {
-    NUM, VAR, IF, ELSE, WHILE, LBRA, RBRA, LPAR, RPAR,
-    ADD, SUB, MUL, DIV, LESS, ASSIG,
-    SEMICOL, ENDFILE, ERROR, PRINT;
+    NUM,
+    VAR,
+    IF,
+    ELSE,
+    WHILE,
+    LBRA,
+    RBRA,
+    LPAR,
+    RPAR,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    LESS,
+    ASSIG,
+    SEMICOL,
+    ENDFILE,
+    ERROR,
+    PRINT;
 
     public static Map<String, TokenTypes> charMap() {
         Map<String, TokenTypes> map = new HashMap<>();

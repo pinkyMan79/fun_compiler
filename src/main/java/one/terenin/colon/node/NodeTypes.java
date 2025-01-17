@@ -14,7 +14,6 @@ public enum NodeTypes {
     IFELSE,
     WHILE,
     EMPTY,
-
     SEQ, // sequence of expressions (past and now -> op1, op2)
     EXPR,
     PROG,
