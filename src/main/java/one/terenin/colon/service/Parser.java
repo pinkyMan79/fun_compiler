@@ -13,7 +13,7 @@ public class Parser {
     private int currentTokenIndex = 0;
     private List<Token> tokens;
 
-    private Node root;
+    private Node root; // for debug only
 
     public boolean parse(List<Token> tokens, Node result) {
         this.tokens = tokens;
